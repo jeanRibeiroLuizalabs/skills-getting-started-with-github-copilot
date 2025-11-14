@@ -14,10 +14,38 @@ document.addEventListener("DOMContentLoaded", () => {
       .replace(/'/g, "&#039;");
   }
 
+  // Função para remover participante
+  async function removeParticipant(activityName, email) {
+    try {
+      const response = await fetch(`/activities/${encodeURIComponent(activityName)}/unregister?email=${encodeURIComponent(email)}`, {
+        method: "POST",
+      });
+      const result = await response.json();
+      if (response.ok) {
+        showMessage(result.message, "success");
+        fetchActivities();
+      } else {
+        showMessage(result.detail || "An error occurred", "error");
+      }
+    } catch (error) {
+      showMessage("Failed to remove participant. Please try again.", "error");
+      console.error("Error removing participant:", error);
+    }
+  }
+
+  function showMessage(msg, type) {
+    messageDiv.textContent = msg;
+    messageDiv.className = type;
+    messageDiv.classList.remove("hidden");
+    setTimeout(() => {
+      messageDiv.classList.add("hidden");
+    }, 5000);
+  }
+
   // Function to fetch activities from API
   async function fetchActivities() {
     try {
-      const response = await fetch("/activities");
+      const response = await fetch("/activities", { cache: "no-store" });
       const activities = await response.json();
 
       // Clear loading message and dropdown
@@ -36,12 +64,22 @@ document.addEventListener("DOMContentLoaded", () => {
         let participantsHtml = "";
         if (Array.isArray(details.participants) && details.participants.length > 0) {
           const items = details.participants
-            .map(p => `<li class="participant-item">${escapeHtml(p)}</li>`)
+            .map(p => `
+              <div class="participant-item">
+                <span>${escapeHtml(p)}</span>
+                <button class="delete-participant" title="Remove participant" data-activity="${escapeHtml(name)}" data-email="${escapeHtml(p)}">
+                  <svg width="18" height="18" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="vertical-align:middle">
+                    <circle cx="10" cy="10" r="10" fill="#ffebee"/>
+                    <path d="M7 7L13 13M13 7L7 13" stroke="#d32f2f" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            `)
             .join("");
           participantsHtml = `
             <div class="participants-section">
               <h5>Participants</h5>
-              <ul class="participants-list">${items}</ul>
+              <div class="participants-list">${items}</div>
             </div>
           `;
         } else {
@@ -68,6 +106,17 @@ document.addEventListener("DOMContentLoaded", () => {
         option.value = name;
         option.textContent = name;
         activitySelect.appendChild(option);
+      });
+
+      // Adiciona evento aos botões de exclusão
+      document.querySelectorAll(".delete-participant").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          const activityName = btn.getAttribute("data-activity");
+          const email = btn.getAttribute("data-email");
+          if (confirm(`Remove ${email} from ${activityName}?`)) {
+            removeParticipant(activityName, email);
+          }
+        });
       });
     } catch (error) {
       activitiesList.innerHTML = "<p>Failed to load activities. Please try again later.</p>";
